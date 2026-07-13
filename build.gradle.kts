@@ -2,11 +2,20 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ktor)
+    alias(libs.plugins.dependencyCheck)
+    alias(libs.plugins.axionRelease)
     application
 }
 
 group = "pl.forestdev.common"
-version = "1.0-SNAPSHOT"
+
+scmVersion {
+    tag {
+        initialVersion { _, _ -> "1.0.0"}
+    }
+}
+
+version = scmVersion.version
 
 repositories {
     mavenCentral()
@@ -14,7 +23,7 @@ repositories {
 }
 
 application {
-    mainClass.set("io.ktor.server.netty.EngineMain")
+    mainClass.set("pl.forestdev.nvd.ApplicationKt")
 }
 
 dependencies {
@@ -22,18 +31,25 @@ dependencies {
     implementation(libs.bundles.ktor.client)
     implementation(libs.bundles.exposed)
     implementation(libs.sqlite.jdbc)
+    implementation(libs.hikaricp)
     runtimeOnly(libs.logback.classic)
 
     testImplementation(libs.ktor.server.test.host)
-    testImplementation("io.kotest:kotest-runner-junit5:5.9.0")
-    testImplementation("io.kotest:kotest-assertions-core:5.9.0")
-    testImplementation("io.kotest:kotest-property:5.9.0")
-    testImplementation("io.mockk:mockk:1.13.10")
+    testImplementation(libs.kotest.runner)
+    testImplementation(libs.kotest.assertions)
+    testImplementation(libs.kotest.property)
+    testImplementation(libs.mockk)
     testImplementation(kotlin("test"))
 }
 
 kotlin {
     jvmToolchain(21)
+}
+
+ktor {
+    docker {
+        localImageName.set("nvd-local-server")
+    }
 }
 
 tasks.test {

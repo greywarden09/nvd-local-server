@@ -24,7 +24,7 @@ import java.sql.Connection
 fun Application.module() {
     val dbUrl = environment.config.property("nvd.db.url").getString()
     val db = DatabaseFactory.connect(dbUrl)
-    TransactionManager.manager.defaultIsolationLevel = Connection.TRANSACTION_SERIALIZABLE
+    TransactionManager.manager.defaultIsolationLevel = Connection.TRANSACTION_READ_COMMITTED
     DatabaseFactory.initSchema(db)
 
     val nvdConfig = nvdConfigFromEnv(environment.config.property("nvd.api.baseUrl").getString())

@@ -21,13 +21,31 @@ A standalone Kotlin-based server designed to serve a local copy of the National 
 
 ### Build from Source
 
-Clone the repository and build the project using the provided Gradle wrapper:
-
+#### Standalone Fat JAR
+Build a single executable JAR containing all dependencies:
 ```bash
-./gradlew build
+./gradlew buildFatJar
 ```
+The executable JAR will be located in `build/libs/nvd-local-server-all.jar`.
 
-The executable JAR will be located in `build/libs/`.
+#### Docker Image
+Build the Docker image locally using Jib:
+```bash
+./gradlew jibDockerBuild
+```
+This builds an image named `nvd-local-server`.
+
+### Running with Docker
+
+Run the server with a persistent volume for the database and mirrors:
+```bash
+docker run -d \
+  --name nvd-server \
+  -p 8080:8080 \
+  -v $(pwd)/data:/app/data \
+  -e NVD_API_KEY=your_api_key \
+  nvd-local-server
+```
 
 ## Configuration
 
@@ -41,6 +59,23 @@ Key configuration options:
 ### API Key
 
 Set the `NVD_API_KEY` environment variable to increase the sync rate. Without a key, the sync process will be significantly slower to comply with NVD rate limits.
+
+## Gradle Integration
+
+To use this server as a local mirror in your projects using the [OWASP Dependency-Check Gradle plugin](https://plugins.gradle.org/plugin/org.owasp.dependencycheck), add the following configuration to your `build.gradle.kts`:
+
+```kotlin
+dependencyCheck {
+    nvd {
+        // Point to your local server instance
+        endpoint = "http://localhost:8080/rest/json/cves/2.0"
+        
+        // Optional: match server performance
+        delay = 200 
+        resultsPerPage = 2000
+    }
+}
+```
 
 ## Usage
 

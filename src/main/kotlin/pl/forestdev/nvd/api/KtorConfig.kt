@@ -48,8 +48,9 @@ fun Application.configureRouting(db: Database, mirrorDir: File) {
 
             val (total, items) = withContext(Dispatchers.IO) {
                 transaction(db) {
-                    val totalCount = Cves.selectAll().where(pred).count().toInt()
-                    val page = Cves.selectAll().where(pred)
+                    val query = Cves.selectAll().where(pred)
+                    val totalCount = query.count().toInt()
+                    val page = query
                         .orderBy(orderCol to SortOrder.ASC, Cves.id to SortOrder.ASC)
                         .limit(perPage).offset(startIndex.toLong())
                         .map { JsonObject(mapOf("cve" to it[Cves.data])) }

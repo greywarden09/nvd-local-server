@@ -51,7 +51,7 @@ fun buildNvdClient(cfg: NvdConfig): HttpClient = HttpClient(CIO) {
         json(Json { ignoreUnknownKeys = true })
     }
     install(HttpTimeout) {
-        requestTimeoutMillis = 60_000
+        requestTimeoutMillis = 300_000
         connectTimeoutMillis = 15_000
         socketTimeoutMillis  = 60_000
     }

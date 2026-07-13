@@ -1,5 +1,7 @@
 package pl.forestdev.nvd.db
 
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -13,6 +15,7 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.upsert
 import org.jetbrains.exposed.v1.json.jsonb
 import java.sql.DriverManager
+import java.util.Properties
 
 val nvdJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
 
@@ -31,20 +34,18 @@ object SyncState : Table("sync_state") {
 
 object DatabaseFactory {
     fun connect(url: String): Database {
-        applySqlitePragmas(url)
-        return Database.connect(url, driver = "org.sqlite.JDBC")
-    }
-
-    private fun applySqlitePragmas(url: String) {
-        if (url == "jdbc:sqlite::memory:") return
-        DriverManager.getConnection(url).use { conn ->
-            conn.autoCommit = true
-            conn.createStatement().use { st ->
-                st.execute("PRAGMA journal_mode=WAL;")
-                st.execute("PRAGMA busy_timeout=5000;")
-                st.execute("PRAGMA synchronous=NORMAL;")
-            }
+        val config = HikariConfig().apply {
+            jdbcUrl = url
+            driverClassName = "org.sqlite.JDBC"
+            maximumPoolSize = 10
+            addDataSourceProperty("journal_mode", "WAL")
+            addDataSourceProperty("synchronous", "NORMAL")
+            addDataSourceProperty("busy_timeout", "5000")
+            addDataSourceProperty("mmap_size", "268435456")
+            addDataSourceProperty("temp_store", "MEMORY")
         }
+        val ds = HikariDataSource(config)
+        return Database.connect(ds)
     }
 
     fun initSchema(db: Database) = transaction(db) {
