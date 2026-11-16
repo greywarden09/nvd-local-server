@@ -97,6 +97,8 @@ Syncs the local database with the latest NVD data, generates data feeds, and exi
 java -jar build/libs/nvd-local-server-all.jar --sync-and-exit
 ```
 
+Add `--no-datafeed` to skip generating the `.json.gz` feeds (only the database is updated).
+
 ## API Endpoints
 
 - **Health Check**: `GET /health`

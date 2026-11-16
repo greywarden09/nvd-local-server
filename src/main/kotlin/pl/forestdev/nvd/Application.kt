@@ -52,13 +52,13 @@ fun Application.module() {
 
 fun main(args: Array<String>) {
     if (args.contains("--sync-and-exit")) {
-        runSyncAndExit()
+        runSyncAndExit(skipDatafeed = args.contains("--no-datafeed"))
         return
     }
     EngineMain.main(args)
 }
 
-private fun runSyncAndExit() = runBlocking {
+private fun runSyncAndExit(skipDatafeed: Boolean) = runBlocking {
     val log = LoggerFactory.getLogger("NvdSync")
 
     val config = YamlConfig("application.yaml")
@@ -83,7 +83,11 @@ private fun runSyncAndExit() = runBlocking {
 
     client.use {
         syncService.runSync()
-        DatafeedGenerator(db, File("data/mirror")).generate()
-        log.info("Sync completed, datafeed rebuilt")
+        if (skipDatafeed) {
+            log.info("Sync completed, datafeed generation skipped")
+        } else {
+            DatafeedGenerator(db, File("data/mirror")).generate()
+            log.info("Sync completed, datafeed rebuilt")
+        }
     }
 }
