@@ -27,7 +27,7 @@ class SyncScheduler(
                 throw e
             } catch (e: Exception) {
                 val wait = backoff
-                log.warn("NVD sync error: {} — retrying in {}", e.message, wait)
+                log.warn("NVD sync error — retrying in {}", wait, e)
                 backoff = (backoff * 2).coerceAtMost(maxBackoff)
                 wait
             }

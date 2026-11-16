@@ -12,11 +12,16 @@ import io.ktor.client.request.accept
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
+import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.request
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
 import kotlinx.serialization.json.JsonObject
 
 
@@ -46,6 +51,8 @@ fun nvdConfigFromEnv(baseUrl: String, resultsPerPage: Int = 2000): NvdConfig =
         resultsPerPage = resultsPerPage,
     )
 
+private val log = LoggerFactory.getLogger("pl.forestdev.nvd.client.NvdClient")
+
 fun buildNvdClient(cfg: NvdConfig): HttpClient = HttpClient(CIO) {
     install(ContentNegotiation) {
         json(Json { ignoreUnknownKeys = true })
@@ -56,16 +63,31 @@ fun buildNvdClient(cfg: NvdConfig): HttpClient = HttpClient(CIO) {
         socketTimeoutMillis  = 60_000
     }
     install(HttpRequestRetry) {
-        retryOnServerErrors(maxRetries = 5)
-        retryIf { _, response -> response.status.value == 429 }
+        maxRetries = 5
+        retryIf { _, response -> response.status.value == 429 || response.status.value >= 500 }
         retryOnExceptionIf(maxRetries = 5) { _, cause ->
             cause is HttpRequestTimeoutException || cause is java.io.IOException
         }
         exponentialDelay(base = 2.0, maxDelayMs = 30_000)
+        modifyRequest { request ->
+            val response = response
+            if (response != null) {
+                log.warn(
+                    "NVD request retry #{}: HTTP {} {}",
+                    retryCount, response.status, request.url,
+                )
+            } else {
+                log.warn(
+                    "NVD request retry #{}: {} {}",
+                    retryCount, cause?.javaClass?.simpleName, cause?.message,
+                )
+            }
+        }
     }
     defaultRequest {
         url(cfg.baseUrl)
         accept(ContentType.Application.Json)
+        header(HttpHeaders.UserAgent, "nvd-local-server")
         cfg.apiKey?.let { header("apiKey", it) }
     }
 }
@@ -85,6 +107,12 @@ suspend fun HttpClient.fetchCvePage(
     }
     if (resp.status == HttpStatusCode.Forbidden) {
         error("NVD 403: ${resp.headers["message"] ?: "no details"}")
+    }
+    if (!resp.status.isSuccess()) {
+        val body = runCatching { resp.bodyAsText() }.getOrDefault("").take(1000)
+        val headers = resp.headers.entries().joinToString { (k, v) -> "$k=$v" }
+        log.warn("NVD HTTP {} for {}: headers=[{}] body={}", resp.status, resp.request.url, headers, body)
+        error("NVD HTTP ${resp.status}: $body")
     }
     resp.body()
 }

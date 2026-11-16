@@ -1,0 +1,77 @@
+name: Sync NVD database
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-db
+  cancel-in-progress: false
+
+env:
+  KEEP_RELEASES: 7
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Download previous database
+        run: |
+          mkdir -p data
+          prev=$(gh release list --limit 50 --json tagName --jq '[.[] | select(.tagName | startswith("db-"))][0].tagName // ""')
+          if [ -z "$prev" ]; then
+            echo "::warning::No previous db-* release found, syncing from scratch"
+            exit 0
+          fi
+          echo "Previous release: $prev"
+          gh release download "$prev" --pattern 'nvd.db.zst' --dir data
+          zstd -d --rm data/nvd.db.zst -o data/nvd.db
+
+      - name: Build
+        run: ./gradlew buildFatJar --no-daemon
+
+      - name: Sync
+        run: java -jar build/libs/nvd-local-server-all.jar --sync-and-exit
+
+      - name: Package database
+        run: |
+          sqlite3 data/nvd.db "VACUUM INTO 'nvd-snapshot.db'"
+          zstd -19 -T0 nvd-snapshot.db -o nvd.db.zst
+          sha256sum nvd.db.zst > nvd.db.zst.sha256
+          ls -lh nvd.db.zst
+
+      - name: Publish release
+        run: |
+          tag="db-$(date -u +%Y-%m-%d)"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" nvd.db.zst nvd.db.zst.sha256 --clobber
+          else
+            gh release create "$tag" nvd.db.zst nvd.db.zst.sha256 \
+              --title "NVD database $tag" \
+              --notes "Daily NVD database snapshot (SQLite, zstd-compressed)." \
+              --latest
+          fi
+
+      - name: Prune old releases
+        run: |
+          gh release list --limit 200 --json tagName --jq '[.[] | select(.tagName | startswith("db-"))] | .[env.KEEP_RELEASES | tonumber:] | .[].tagName' \
+            | xargs -r -n1 gh release delete --cleanup-tag --yes
