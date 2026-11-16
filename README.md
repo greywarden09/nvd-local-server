@@ -13,7 +13,7 @@ A standalone Kotlin-based server designed to serve a local copy of the National 
 
 ## Prerequisites
 
-- **Java 21** or higher.
+- **Java 25** or higher.
 - **Internet Access**: Required for initial and periodic synchronization with NVD.
 - **NVD API Key** (Recommended): To avoid strict rate limits from the public NVD API.
 
