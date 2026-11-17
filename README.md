@@ -33,14 +33,22 @@ Build the Docker image locally using Jib:
 ```bash
 ./gradlew jibDockerBuild
 ```
-This builds an image named `nvd-local-server`.
+This builds an image named `nvd-local-server:latest`.
 
 ### Running with Docker
+
+The quickest way is the helper script. It takes the host port as an optional argument (default `8080`), uses `./data` as the volume (override with `DATA_DIR`) and passes `NVD_API_KEY` if it is set:
+```bash
+./run-docker.sh 9090
+```
+
+Or run the container manually:
 
 Run the server with a persistent volume for the database and mirrors:
 ```bash
 docker run -d \
   --name nvd-server \
+  --user $(id -u):$(id -g) \
   -p 8080:8080 \
   -v $(pwd)/data:/app/data \
   -e NVD_API_KEY=your_api_key \

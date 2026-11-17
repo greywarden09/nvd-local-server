@@ -51,6 +51,15 @@ ktor {
     }
 }
 
+configure<com.google.cloud.tools.jib.gradle.JibExtension> {
+    to {
+        image = "nvd-local-server"
+    }
+    container {
+        workingDirectory = "/app"
+    }
+}
+
 tasks.test {
     useJUnitPlatform()
 }
